@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<head>
+	<!-- Load TensorFlow.js -->
+	<script src='https://unpkg.com/@tensorflow/tfjs'></script>
+	<!-- Load Posenet -->
+	<script src='https://unpkg.com/@tensorflow-models/posenet'></script>
+
+</head>
+
+<body>
+        <video id='sourceVideo' playsinline style=' -moz-transform: scaleX(-1);
+	        -o-transform: scaleX(-1);
+	        -webkit-transform: scaleX(-1);
+	        transform: scaleX(-1);
+		display: none;
+	        '>
+        </video>
+</body>
+
+<!-- ml-posenet-gui -->
+<script src='vendor/dat.gui/build/dat.gui.js'></script>
+
+<!-- Place your code in the script tag below. You can also use an external .js file -->
+<script type='module'>
+import mlPosenet from '../src/index.js'
+(async function(){
+	var sourceEl = await mlPosenet.Utils.setupCamera()
+
+	const canvasEl = document.createElement('canvas')
+	canvasEl.width = canvasEl.height = 512
+	canvasEl.style.width = canvasEl.style.height = 512
+	document.body.appendChild(canvasEl)
+	var resultsViewer = new mlPosenet.ResultsViewer(canvasEl)
+
+	const parameters = mlPosenet.Parameters.Sample
+
+
+	//////////////////////////////////////////////////////////////////////////////
+	//		Load model
+	//////////////////////////////////////////////////////////////////////////////
+	console.log('Loading models...')
+	var loadingStart = performance.now()
+	var net = await posenet.load(+parameters.input.mobileNetArchitecture)
+	var loadingTime = performance.now() - loadingStart
+	console.log(`models loaded in ${loadingTime.toFixed(2)} msec`)
+
+
+	//////////////////////////////////////////////////////////////////////////////
+	//		Code Separator
+	//////////////////////////////////////////////////////////////////////////////
+	// remove the net parameters
+	mlPosenet.createDatGUI(parameters);
+
+
+	//////////////////////////////////////////////////////////////////////////////
+	//		Code Separator
+	//////////////////////////////////////////////////////////////////////////////
+	requestAnimationFrame(async function callback(){
+
+		//////////////////////////////////////////////////////////////////////////////
+		//		Code Separator
+		//////////////////////////////////////////////////////////////////////////////
+		// reload network on parameters.changeToArchitecture
+		if (parameters.changeToArchitecture) {
+			// Important to purge variables and free up GPU memory
+			net.dispose();
+
+			console.log(`Loading models ${parameters.changeToArchitecture}...`)
+			var loadingStart = performance.now()
+
+			net = await posenet.load(+parameters.changeToArchitecture);
+
+			var loadingTime = performance.now() - loadingStart
+			console.log(`models loaded in ${loadingTime.toFixed(2)} msec`)
+
+			parameters.changeToArchitecture = null;
+		}
+
+
+		//////////////////////////////////////////////////////////////////////////////
+		//		Code Separator
+		//////////////////////////////////////////////////////////////////////////////
+		console.log('estimating poses...')
+
+		var startingTime = performance.now()
+		var poses = await mlPosenet.Utils.estimatePoses(sourceEl, net, parameters)
+		var estimationTime = performance.now() - startingTime
+		console.log(`Poses estimated in ${estimationTime.toFixed(2)} ms`)
+
+		//////////////////////////////////////////////////////////////////////////////
+		//		Code Separator
+		//////////////////////////////////////////////////////////////////////////////
+
+		resultsViewer.update(poses, sourceEl, parameters)
+
+
+		// NOTE: it MUST be at the end, as it is a async function
+		requestAnimationFrame(callback)
+	})
+
+})()
+</script>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<head>
+	<!-- Load TensorFlow.js -->
+	<script src='https://unpkg.com/@tensorflow/tfjs'></script>
+	<!-- Load Posenet -->
+	<script src='https://unpkg.com/@tensorflow-models/posenet'></script>
+</head>
+
+<body>
+	<img id='sourceImage' crossOrigin='' src='https://storage.googleapis.com/tfjs-models/assets/posenet/kyte.jpg'/>
+	<canvas id='canvasOutput' />
+</body>
+
+<!-- script from build  -->
+<!-- <script src='../build/ml-posenet.js'></script> -->
+
+<!-- Place your code in the script tag below. You can also use an external .js file -->
+<script type='module'>
+// import directly from src/
+import mlPosenet from '../src/index.js'
+
+// import from build/ <- this doesnt work
+// import mlPosenet from '../build/ml-posenet.js'
+(async function(){
+	var sourceEl = document.querySelector('#sourceImage');
+
+	const parameters = mlPosenet.Parameters.Sample
+
+	//////////////////////////////////////////////////////////////////////////////
+	//		Load model
+	//////////////////////////////////////////////////////////////////////////////
+	console.log('Loading models...')
+	var net = await posenet.load(+parameters.input.mobileNetArchitecture)
+	console.log(`models loaded`)
+
+	//////////////////////////////////////////////////////////////////////////////
+	//		Code Separator
+	//////////////////////////////////////////////////////////////////////////////
+	console.log('estimating poses...')
+
+	var startingTime = performance.now()
+	var poses = await mlPosenet.Utils.estimatePoses(sourceEl, net, parameters)
+	var estimationTime = performance.now() - startingTime
+	console.log(`Poses estimated in ${estimationTime.toFixed(2)} ms`)
+	console.log('poses', poses)
+
+	//////////////////////////////////////////////////////////////////////////////
+	//		Code Separator
+	//////////////////////////////////////////////////////////////////////////////
+
+	const canvasEl = document.querySelector('#canvasOutput')
+	canvasEl.width = canvasEl.height = 512
+	canvasEl.style.width = canvasEl.style.height = 512
+
+	var resultsViewer = new mlPosenet.ResultsViewer(canvasEl)
+	resultsViewer.update(poses, sourceEl, parameters)
+})()
+</script>
