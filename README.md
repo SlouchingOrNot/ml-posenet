@@ -4,4 +4,7 @@ It makes it easier to use, in my case.
 
 posenet and tensorflow are really great tools!!!
 
- 
+# Examples
+- https://slouchingornot.github.io/ml-posenet/examples/image.html
+- https://slouchingornot.github.io/ml-posenet/examples/webcam.html
+- https://slouchingornot.github.io/ml-posenet/examples/webcam.html
