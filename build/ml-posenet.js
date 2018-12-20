@@ -57,8 +57,16 @@
 	var mlPosenet$1 = mlPosenet$1 || {};
 
 
+
 	mlPosenet$1.Utils = (function(){
-	        
+
+	        async function warmUp(posenetModel) {
+	        	let canvasEl = document.createElement('canvas');
+	        	canvasEl.width = 224;
+	        	canvasEl.height = 224;
+	        	await mlPosenet$1.Utils.estimatePoses(canvasEl, posenetModel, Parameters.Sample);
+	        }
+
 	        async function estimatePoses(sourceEl, net, parameters, flipHorizontal){
 	                // handle arguments default values
 	                if( flipHorizontal === undefined ){
@@ -83,18 +91,18 @@
 	                        default:
 	                                console.assert(false, `unknown algorithm ${parameters.algorithm}`);
 			}
-	                return poses         
+	                return poses
 	        }
-	        
+
 	        // TODO make that private - anonymous function
 	        // in fact put all that in a namespace
 	        const color = 'pink';
 	        const lineWidth = 2;
-	        
+
 	        function toTuple({ y, x }) {
 	                return [y, x];
 	        }
-	        
+
 	        /**
 	        * Draws a line on a canvas, i.e. a joint
 	        */
@@ -106,7 +114,7 @@
 	                ctx.strokeStyle = color;
 	                ctx.stroke();
 	        }
-	        
+
 	        /**
 	        * Draws a pose skeleton by looking up all adjacent keypoints/joints
 	        */
@@ -114,67 +122,72 @@
 	                const adjacentKeyPoints = posenet.getAdjacentKeyPoints(
 	                        keypoints, minConfidence
 	                );
-	                
+
 	                adjacentKeyPoints.forEach((keypoints) => {
 	                        drawSegment(toTuple(keypoints[0].position),
 	                        toTuple(keypoints[1].position), color, scale, ctx);
 	                });
 	        }
-	        
+
 	        /**
 	        * Draw pose keypoints onto a canvas
 	        */
 	        function drawKeypoints(keypoints, minConfidence, context, scale = 1) {
 	                // debugger
 
-	                context.font = "12px Arial bolder";
+	                context.font = "8px Arial bolder";
 	                for (let i = 0; i < keypoints.length; i++) {
 	                        const keypoint = keypoints[i];
-	                        
+
 	                        if (keypoint.score < minConfidence) {
 	                                continue;
 	                        }
-	                        
+
 	                        const { y, x } = keypoint.position;
 	                        context.beginPath();
 	                        context.arc(x * scale, y * scale, 3, 0, 2 * Math.PI);
 	                        context.fillStyle = color;
 	                        context.fill();
-	                        
+
 	                        context.fillStyle = 'aqua';
 	                        context.fillText(keypoint.part, x * scale+4, y * scale+2);
 
 	                        context.fillStyle = 'aqua';
-	                        context.fillText((keypoint.score*100).toFixed(2), x * scale+4, y * scale+15);
+	                        context.fillText((keypoint.score*100).toFixed(2), x * scale+4, y * scale+10);
 	                }
 	        }
-	        
+
 	        //////////////////////////////////////////////////////////////////////////////
 	        //                Code Separator
 	        //////////////////////////////////////////////////////////////////////////////
 		async function setupCamera() {
 			const videoEl = document.querySelector('#sourceVideo');
-			videoEl.width = 512;
-			videoEl.height = 512;
-			
-			const stream = await navigator.mediaDevices.getUserMedia({
-				'audio': false,
-				'video': {
-					facingMode: 'user',
-					width: videoEl.width,
-					height: videoEl.height,
-				},
-			});
-			videoEl.srcObject = stream;
-			
-			return new Promise((resolve) => {
-				videoEl.onloadedmetadata = () => {
-					 videoEl.play();
-					resolve(videoEl);
-				};
-			});
-		}	        
-	        
+			videoEl.width = 224;
+			videoEl.height = 224;
+
+	                try {
+	                        const stream = await navigator.mediaDevices.getUserMedia({
+	                                'audio': false,
+	                                'video': {
+	                                        // facingMode: 'user',
+	                                        width: videoEl.width,
+	                                        height: videoEl.height,
+	                                },
+	                        });
+	                        videoEl.srcObject = stream;        
+	                        return new Promise((resolve) => {
+	                                videoEl.onloadedmetadata = () => {
+	                                        videoEl.play();
+	                                        resolve(videoEl);
+	                                };
+	                        });
+	                }catch(myException){
+	                        return new Promise((resolve, reject) => {
+	                                reject(new Error(myException.message));
+	                        });
+	                }
+		}
+
 	        //////////////////////////////////////////////////////////////////////////////
 	        //		Code Separator
 	        //////////////////////////////////////////////////////////////////////////////
@@ -182,21 +195,22 @@
 	                function isAndroid() {
 	                        return /Android/i.test(navigator.userAgent);
 	                }
-	                
+
 	                function isiOS() {
 	                        return /iPhone|iPad|iPod/i.test(navigator.userAgent);
 	                }
 	                return isAndroid() || isiOS();
 	        }
-	        
+
 	        return {
+	                warmUp: warmUp,
 	                setupCamera: setupCamera,
 	                isMobile : isMobile,
 	                drawKeypoints: drawKeypoints,
 	                drawSkeleton: drawSkeleton,
 	                estimatePoses: estimatePoses,
 	        }
-	        
+
 	})();
 
 
@@ -205,10 +219,8 @@
 
 	var mlPosenet$2 = mlPosenet$2 || {};
 	mlPosenet$2.ResultsViewer = function(canvasEl){
-		const canvasSize = 640;
-
-		canvasEl.width = canvasSize;
-		canvasEl.height = canvasSize;
+		const canvasSize = canvasEl.width;
+		console.assert(canvasEl.width === canvasEl.height);
 
 		const context = canvasEl.getContext('2d');
 
@@ -330,12 +342,69 @@
 	// es6 export
 	var createDatGUI = mlPosenet$3.createDatGUI;
 
+	var mlPosenet$4 = mlPosenet$4 || {};
+
+	//////////////////////////////////////////////////////////////////////////////
+	//		Code Separator
+	//////////////////////////////////////////////////////////////////////////////
+	var partsIndex = {};
+	let partNamesInOrder = ["nose", "leftEye", "rightEye", "leftEar", "rightEar", "leftShoulder", "rightShoulder",
+		"leftElbow", "rightElbow", "leftWrist", "rightWrist", "leftHip", "rightHip",
+		"leftKnee", "rightKnee", "leftAnkle", "rightAnkle"];
+	partNamesInOrder.forEach((partName, index) => {
+		partsIndex[partName] = index;
+	});
+
+	//////////////////////////////////////////////////////////////////////////////
+	//		Code Separator
+	//////////////////////////////////////////////////////////////////////////////
+	function computeMiddlePartsKeypoint(keypoints, partNameA, partNameB){
+		let keypointA = keypoints[partsIndex[partNameA]];
+		let keypointB = keypoints[partsIndex[partNameB]];
+		console.assert(keypointA.part === partNameA);
+		console.assert(keypointB.part === partNameB);
+		let keypoint = {
+			position : {
+				x: (keypointA.position.x + keypointB.position.x)/2,
+				y: (keypointA.position.y + keypointB.position.y)/2,					
+			}
+		};
+		return keypoint
+	}
+	function computeDistanceBetweenParts(keypoints, partNameA, partNameB){
+		let keypointA = keypoints[partsIndex[partNameA]];
+		let keypointB = keypoints[partsIndex[partNameB]];
+		return computeDistanceBetweenKeypoints(keypointA, keypointB)
+	}
+	function computeDistanceBetweenKeypoints(keypointA, keypointB){
+		let deltaX = keypointA.position.x - keypointB.position.x;
+		let deltaY = keypointA.position.y - keypointB.position.y;
+		let distance = Math.sqrt( deltaX*deltaX + deltaY*deltaY);
+		return distance
+	}
+
+	//////////////////////////////////////////////////////////////////////////////
+	//		export
+	//////////////////////////////////////////////////////////////////////////////
+	mlPosenet$4.KeypointUtils = {
+		partsIndex,
+		partNamesInOrder,
+		
+		computeMiddlePartsKeypoint,
+		computeDistanceBetweenParts,
+		computeDistanceBetweenKeypoints,
+	};
+
+	// es6 export
+	var KeypointUtils = mlPosenet$4.KeypointUtils;
+
 	// es6 export
 	var index = {
 		Parameters: Parameters,
 		Utils: Utils,
 		ResultsViewer: ResultsViewer,
 		createDatGUI: createDatGUI,
+		KeypointUtils,
 	};
 
 	return index;
